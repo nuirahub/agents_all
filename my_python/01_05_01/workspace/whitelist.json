@@ -1,0 +1,4 @@
+{
+  "allowed_recipients": ["mfigurska@o2.pl", "@yourdomain.com"],
+  "_comment": "Add email addresses or domain patterns (@domain.com) to allow sending"
+}

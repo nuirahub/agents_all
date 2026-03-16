@@ -1,0 +1,481 @@
+{
+  "sourceFile": "C:\\Users\\nuira\\Projects\\AI_devs4\\szkolenie\\git\\my_python\\01_01_grounding\\notes\\notes.md",
+  "model": "gpt-5.4",
+  "paragraphs": [
+    {
+      "index": 0,
+      "text": "# Understanding Large Language Models",
+      "concepts": [
+        {
+          "label": "Large language model",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "Large language models definition overview",
+          "reason": "The header centers on the domain-specific concept discussed in the document.",
+          "surfaceForms": [
+            "Large Language Models"
+          ]
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "text": "Large language models like GPT-4 and Claude are trained using a technique called next-token prediction. The model learns to predict the most likely next word given all previous words in a sequence. This simple objective, when scaled to billions of parameters and trillions of tokens, produces emergent capabilities.",
+      "concepts": [
+        {
+          "label": "Large language model",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "large language models definition GPT-4 Claude",
+          "reason": "Core domain-specific concept framing the paragraph's subject.",
+          "surfaceForms": [
+            "Large language models"
+          ]
+        },
+        {
+          "label": "GPT-4",
+          "category": "entity",
+          "needsSearch": true,
+          "searchQuery": "GPT-4 large language model OpenAI",
+          "reason": "Named model used as a central example of a large language model.",
+          "surfaceForms": [
+            "GPT-4"
+          ]
+        },
+        {
+          "label": "Claude",
+          "category": "entity",
+          "needsSearch": true,
+          "searchQuery": "Claude large language model Anthropic",
+          "reason": "Named model used as a central example alongside GPT-4.",
+          "surfaceForms": [
+            "Claude"
+          ]
+        },
+        {
+          "label": "Next-token prediction",
+          "category": "method",
+          "needsSearch": true,
+          "searchQuery": "next-token prediction language model training",
+          "reason": "Named training technique presented as the main method used for these models.",
+          "surfaceForms": [
+            "a technique called next-token prediction"
+          ]
+        },
+        {
+          "label": "Next-word prediction objective",
+          "category": "definition",
+          "needsSearch": true,
+          "searchQuery": "next-token prediction predict the most likely next word given previous words",
+          "reason": "The paragraph explicitly explains what next-token prediction means.",
+          "surfaceForms": [
+            "predict the most likely next word",
+            "given all previous words"
+          ]
+        },
+        {
+          "label": "Scaling next-token prediction yields emergent capabilities",
+          "category": "claim",
+          "needsSearch": true,
+          "searchQuery": "billions of parameters trillions of tokens emergent capabilities language models",
+          "reason": "Verifiable claim linking model scale and training data size to emergent capabilities.",
+          "surfaceForms": [
+            "scaled to billions of parameters",
+            "trillions of tokens",
+            "produces emergent capabilities"
+          ]
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "text": "## The Transformer Architecture",
+      "concepts": [
+        {
+          "label": "Transformer architecture",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "Transformer architecture deep learning definition attention is all you need",
+          "reason": "This header names the central technical concept likely discussed in the section and benefits from grounding to its standard meaning in machine learning.",
+          "surfaceForms": [
+            "The Transformer Architecture"
+          ]
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "text": "The transformer was introduced by Google researchers in 2017. Unlike RNNs which process tokens sequentially, transformers use self-attention to process all tokens in parallel. This parallelization enabled training on much larger datasets using GPU clusters.",
+      "concepts": [
+        {
+          "label": "Transformer (neural network architecture)",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "Transformer neural network architecture introduced by Google researchers 2017 Attention Is All You Need",
+          "reason": "Central domain-specific concept discussed in the paragraph.",
+          "surfaceForms": [
+            "The transformer"
+          ]
+        },
+        {
+          "label": "Transformer introduced by Google researchers in 2017",
+          "category": "claim",
+          "needsSearch": true,
+          "searchQuery": "Google researchers introduced the transformer in 2017 Attention Is All You Need",
+          "reason": "Verifiable historical claim with attribution and date.",
+          "surfaceForms": [
+            "introduced by Google researchers in 2017"
+          ]
+        },
+        {
+          "label": "Recurrent neural networks (RNNs)",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "RNNs recurrent neural networks sequential token processing",
+          "reason": "Important comparison term used to contrast transformer behavior.",
+          "surfaceForms": [
+            "RNNs"
+          ]
+        },
+        {
+          "label": "Self-attention",
+          "category": "method",
+          "needsSearch": true,
+          "searchQuery": "self-attention transformer process all tokens in parallel",
+          "reason": "Core mechanism identified as the transformer's processing method.",
+          "surfaceForms": [
+            "use self-attention",
+            "process all tokens in parallel"
+          ]
+        },
+        {
+          "label": "Sequential token processing in RNNs",
+          "category": "claim",
+          "needsSearch": true,
+          "searchQuery": "RNNs process tokens sequentially",
+          "reason": "Verifiable comparative statement about how RNNs operate.",
+          "surfaceForms": [
+            "process tokens sequentially"
+          ]
+        },
+        {
+          "label": "Parallelization enabled large-scale GPU training",
+          "category": "result",
+          "needsSearch": true,
+          "searchQuery": "transformer parallelization enabled training on much larger datasets using GPU clusters",
+          "reason": "Reported outcome linking transformer parallelization to larger-scale training with hardware resources.",
+          "surfaceForms": [
+            "This parallelization enabled training",
+            "much larger datasets",
+            "using GPU clusters"
+          ]
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "text": "The key innovation is the attention mechanism, which allows each token to \"attend\" to every other token in the context window. Modern models like GPT-4 have context windows of 128k tokens, while Claude can handle up to 200k tokens.",
+      "concepts": [
+        {
+          "label": "attention mechanism",
+          "category": "method",
+          "needsSearch": true,
+          "searchQuery": "attention mechanism transformer architecture overview",
+          "reason": "Central technical innovation identified in the paragraph.",
+          "surfaceForms": [
+            "the attention mechanism"
+          ]
+        },
+        {
+          "label": "self-attention over all tokens in the context window",
+          "category": "definition",
+          "needsSearch": true,
+          "searchQuery": "self-attention each token attends to every other token definition",
+          "reason": "The paragraph explains how the attention mechanism works.",
+          "surfaceForms": [
+            "each token to \"attend\" to every other token",
+            "in the context window"
+          ]
+        },
+        {
+          "label": "context window",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "context window definition large language models",
+          "reason": "Domain-specific term that determines how much text a model can process at once.",
+          "surfaceForms": [
+            "the context window",
+            "context windows of 128k tokens"
+          ]
+        },
+        {
+          "label": "GPT-4",
+          "category": "entity",
+          "needsSearch": true,
+          "searchQuery": "GPT-4 official context window",
+          "reason": "Named model used as a concrete example in the paragraph.",
+          "surfaceForms": [
+            "Modern models like GPT-4"
+          ]
+        },
+        {
+          "label": "Claude",
+          "category": "entity",
+          "needsSearch": true,
+          "searchQuery": "Claude official context window 200k tokens",
+          "reason": "Named model compared against GPT-4 in the paragraph.",
+          "surfaceForms": [
+            "while Claude can handle"
+          ]
+        },
+        {
+          "label": "GPT-4 and Claude context-window capacities",
+          "category": "claim",
+          "needsSearch": true,
+          "searchQuery": "GPT-4 128k tokens Claude 200k tokens context window comparison",
+          "reason": "Verifiable quantitative claim comparing the token limits of two modern models.",
+          "surfaceForms": [
+            "context windows of 128k tokens",
+            "up to 200k tokens"
+          ]
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "text": "## Reinforcement Learning from Human Feedback",
+      "concepts": [
+        {
+          "label": "Reinforcement Learning from Human Feedback",
+          "category": "method",
+          "needsSearch": true,
+          "searchQuery": "Reinforcement Learning from Human Feedback RLHF definition method",
+          "reason": "The header introduces a central machine learning method that benefits from grounding and definition.",
+          "surfaceForms": [
+            "Reinforcement Learning from Human Feedback"
+          ]
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "text": "After pre-training, models are fine-tuned using RLHF. Human raters compare model outputs and rank them by quality. This feedback trains a reward model, which then guides the language model toward more helpful and harmless responses.",
+      "concepts": [
+        {
+          "label": "Reinforcement Learning from Human Feedback",
+          "category": "method",
+          "needsSearch": true,
+          "searchQuery": "RLHF reinforcement learning from human feedback language models fine-tuning definition",
+          "reason": "Central training method named in the paragraph and worth grounding with a standard definition.",
+          "surfaceForms": [
+            "fine-tuned using RLHF"
+          ]
+        },
+        {
+          "label": "Pre-training precedes RLHF fine-tuning",
+          "category": "claim",
+          "needsSearch": true,
+          "searchQuery": "language models after pre-training fine-tuned using RLHF",
+          "reason": "Verifiable sequencing claim about model training stages.",
+          "surfaceForms": [
+            "After pre-training",
+            "fine-tuned using RLHF"
+          ]
+        },
+        {
+          "label": "Human raters evaluate and rank model outputs",
+          "category": "method",
+          "needsSearch": true,
+          "searchQuery": "human raters compare model outputs and rank them by quality RLHF",
+          "reason": "Describes the human feedback collection procedure used in RLHF.",
+          "surfaceForms": [
+            "Human raters compare model outputs",
+            "rank them by quality"
+          ]
+        },
+        {
+          "label": "Reward model trained from human feedback",
+          "category": "method",
+          "needsSearch": true,
+          "searchQuery": "RLHF feedback trains a reward model",
+          "reason": "Describes the intermediate model trained from ranked human preferences.",
+          "surfaceForms": [
+            "This feedback trains a reward model"
+          ]
+        },
+        {
+          "label": "Reward model",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "reward model RLHF definition language models",
+          "reason": "Key technical term that benefits from grounding and definition.",
+          "surfaceForms": [
+            "a reward model"
+          ]
+        },
+        {
+          "label": "Helpful and harmless responses",
+          "category": "result",
+          "needsSearch": true,
+          "searchQuery": "RLHF helpful and harmless responses language model alignment",
+          "reason": "States the intended outcome of RLHF-guided optimization.",
+          "surfaceForms": [
+            "more helpful and harmless responses"
+          ]
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "text": "Constitutional AI, developed by Anthropic, is an alternative approach where the model critiques and revises its own outputs based on a set of principles, reducing the need for human feedback.",
+      "concepts": [
+        {
+          "label": "Constitutional AI",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "Constitutional AI Anthropic definition",
+          "reason": "Central domain-specific concept introduced in the paragraph.",
+          "surfaceForms": [
+            "Constitutional AI"
+          ]
+        },
+        {
+          "label": "Anthropic",
+          "category": "entity",
+          "needsSearch": true,
+          "searchQuery": "Anthropic AI company Constitutional AI",
+          "reason": "Named organization associated with developing the approach.",
+          "surfaceForms": [
+            "developed by Anthropic"
+          ]
+        },
+        {
+          "label": "Anthropic developed Constitutional AI",
+          "category": "claim",
+          "needsSearch": true,
+          "searchQuery": "Anthropic developed Constitutional AI",
+          "reason": "Verifiable attribution about who developed the approach.",
+          "surfaceForms": [
+            "developed by Anthropic"
+          ]
+        },
+        {
+          "label": "Self-critique and self-revision",
+          "category": "method",
+          "needsSearch": true,
+          "searchQuery": "Constitutional AI model critiques and revises its own outputs",
+          "reason": "Describes the core procedure used by the approach.",
+          "surfaceForms": [
+            "critiques and revises its own outputs"
+          ]
+        },
+        {
+          "label": "Principle-based output revision",
+          "category": "method",
+          "needsSearch": true,
+          "searchQuery": "Constitutional AI set of principles output revision",
+          "reason": "Specifies that the method is guided by an explicit set of principles.",
+          "surfaceForms": [
+            "based on a set of principles"
+          ]
+        },
+        {
+          "label": "Reduced need for human feedback",
+          "category": "result",
+          "needsSearch": true,
+          "searchQuery": "Constitutional AI reducing the need for human feedback",
+          "reason": "States the reported outcome or advantage of the approach.",
+          "surfaceForms": [
+            "reducing the need for human feedback"
+          ]
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "text": "## Scaling Laws",
+      "concepts": [
+        {
+          "label": "Scaling laws",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "Scaling laws machine learning definition",
+          "reason": "The header introduces a central technical topic likely to be expanded in the following section and benefits from grounding.",
+          "surfaceForms": [
+            "Scaling Laws"
+          ]
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "text": "OpenAI's scaling laws research showed that model performance improves predictably with more compute, data, and parameters. The Chinchilla paper from DeepMind later refined this, showing that many models were undertrained relative to their size.",
+      "concepts": [
+        {
+          "label": "OpenAI scaling laws research",
+          "category": "reference",
+          "needsSearch": true,
+          "searchQuery": "OpenAI scaling laws research language models paper",
+          "reason": "The paragraph cites a specific line of research attributed to OpenAI that can be grounded with the original paper or summary.",
+          "surfaceForms": [
+            "OpenAI's scaling laws research"
+          ]
+        },
+        {
+          "label": "scaling laws",
+          "category": "term",
+          "needsSearch": true,
+          "searchQuery": "scaling laws neural language models definition",
+          "reason": "This is a domain-specific concept central to the paragraph's meaning and benefits from definition and context.",
+          "surfaceForms": [
+            "scaling laws research"
+          ]
+        },
+        {
+          "label": "predictable performance scaling with compute, data, and parameters",
+          "category": "claim",
+          "needsSearch": true,
+          "searchQuery": "model performance improves predictably with more compute data and parameters scaling laws",
+          "reason": "This is a verifiable claim about how model performance changes with scaling factors.",
+          "surfaceForms": [
+            "model performance improves predictably",
+            "more compute, data, and parameters"
+          ]
+        },
+        {
+          "label": "Chinchilla paper",
+          "category": "reference",
+          "needsSearch": true,
+          "searchQuery": "DeepMind Chinchilla paper language models",
+          "reason": "The paragraph references a specific paper that should be grounded by its title, authors, and publication details.",
+          "surfaceForms": [
+            "The Chinchilla paper from DeepMind"
+          ]
+        },
+        {
+          "label": "Chinchilla refinement of scaling laws",
+          "category": "claim",
+          "needsSearch": true,
+          "searchQuery": "Chinchilla paper refined scaling laws DeepMind",
+          "reason": "This states that the Chinchilla work refined earlier scaling-law conclusions, which is a checkable attribution.",
+          "surfaceForms": [
+            "The Chinchilla paper from DeepMind later refined this"
+          ]
+        },
+        {
+          "label": "models undertrained relative to size",
+          "category": "result",
+          "needsSearch": true,
+          "searchQuery": "Chinchilla many models were undertrained relative to their size",
+          "reason": "This is a reported finding from the cited paper and is directly verifiable in the source.",
+          "surfaceForms": [
+            "many models were undertrained",
+            "relative to their size"
+          ]
+        }
+      ]
+    }
+  ],
+  "paragraphCount": 10,
+  "conceptCount": 40
+}

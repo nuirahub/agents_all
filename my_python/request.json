@@ -1,0 +1,5 @@
+{
+  "input": "Wyszukaj najważniejsze informacje o Oscarach 2026 i wyślij mi maila z podsumowaniem na adres jan@example.com.",
+  "instructions": "Jesteś asystentem. Gdy użytkownik prosi o wyszukanie informacji, użyj narzędzia wyszukiwania w internecie. Gdy prosi o wysłanie maila, użyj narzędzia send_email z podanym adresem, tematem i treścią podsumowania.",
+  "model": "gpt-4.1"
+}
