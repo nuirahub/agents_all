@@ -84,6 +84,11 @@ SEND_MESSAGE_DEF = {
     },
 }
 
+# Built-in web search tool (handled by OpenAI Responses API, no local handler)
+WEB_SEARCH_DEF = {
+    "type": "web_search",
+}
+
 
 def run_calculator(args: dict[str, Any]) -> tuple[bool, str]:
     op = (args.get("operation") or "").lower()
@@ -136,14 +141,20 @@ TOOL_META: dict[str, tuple[str, dict, Callable[[dict], tuple[bool, str]]]] = {
     "ask_user": ("human", ASK_USER_DEF, run_ask_user),
     "delegate": ("agent", DELEGATE_DEF, run_delegate),
     "send_message": ("sync", SEND_MESSAGE_DEF, run_send_message),
+    # web_search is a built-in (no local handler) so we don't add it to TOOL_META
 }
 
 
 def get_tool_definitions(names: list[str] | None = None) -> list[dict]:
     """Return OpenAI-format tool list. If names is None, return all."""
+    tools: list[dict] = []
     if names is None:
-        return [m[1] for m in TOOL_META.values()]
-    return [TOOL_META[n][1] for n in names if n in TOOL_META]
+        tools = [m[1] for m in TOOL_META.values()]
+    else:
+        tools = [TOOL_META[n][1] for n in names if n in TOOL_META]
+    # Always expose built-in web_search to the model as well
+    tools.append(WEB_SEARCH_DEF)
+    return tools
 
 
 def get_tool_type(name: str) -> str | None:

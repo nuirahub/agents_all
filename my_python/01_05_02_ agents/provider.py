@@ -64,11 +64,20 @@ def call_provider(
     Output items: message with output_text, or function_call (call_id, name, arguments).
     """
     input_messages = items_to_input(input_items, instructions)
+    # Map our internal tools to OpenAI Responses built-ins.
+    mapped_tools: list[dict] = []
+    for t in tools:
+        if t.get("type") == "web_search":
+            # Use OpenAI web_search_preview tool
+            mapped_tools.append({"type": "web_search_preview"})
+        else:
+            mapped_tools.append(t)
+
     body = {
         "model": model,
         "instructions": instructions,
         "input": input_messages,
-        "tools": tools,
+        "tools": mapped_tools,
         "tool_choice": "auto",
         "max_output_tokens": max_tokens or MAX_OUTPUT_TOKENS,
     }
