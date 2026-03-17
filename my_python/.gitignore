@@ -1,1 +1,7 @@
 .env
+.data/
+*.db
+*.db-wal
+*.db-shm
+agent.log
+__pycache__/

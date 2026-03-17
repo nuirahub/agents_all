@@ -27,6 +27,7 @@ class AgentTemplate:
     name: str
     tools: list[str]
     system_prompt: str
+    model: str | None = None
 
 
 _CACHE: dict[str, AgentTemplate] | None = None
@@ -60,7 +61,8 @@ def _load_all() -> dict[str, AgentTemplate]:
         meta, body = _parse_front_matter(text)
         name = str(meta.get("name") or path.stem)
         tools = list(meta.get("tools") or [])
-        tpl = AgentTemplate(name=name, tools=tools, system_prompt=body.strip())
+        model = str(meta["model"]) if meta.get("model") else None
+        tpl = AgentTemplate(name=name, tools=tools, system_prompt=body.strip(), model=model)
         cache[name] = tpl
     return cache
 

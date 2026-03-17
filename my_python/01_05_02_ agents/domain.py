@@ -72,6 +72,14 @@ class Agent:
 
 
 @dataclass
+class User:
+    id: UserId
+    email: str
+    api_key_hash: str
+    created_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
 class Session:
     id: SessionId
     user_id: UserId | None = None
@@ -176,6 +184,12 @@ def complete_agent(agent: Agent, result: Any = None) -> Agent:
 def fail_agent(agent: Agent, error: str) -> Agent:
     agent.status = "failed"
     agent.error = error
+    agent.completed_at = datetime.now()
+    return agent
+
+
+def cancel_agent(agent: Agent) -> Agent:
+    agent.status = "cancelled"
     agent.completed_at = datetime.now()
     return agent
 

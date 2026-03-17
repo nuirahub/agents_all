@@ -3,14 +3,24 @@ Chat service: create agents, run them via runner, map to API responses.
 """
 from __future__ import annotations
 
-from dataclasses import asdict
-from typing import Any
+from typing import Any, Generator
 
 from config import DEFAULT_MODEL
-from domain import AgentConfig, WaitingFor
+from domain import WaitingFor, start_agent
+from provider_types import StreamEvent
 from repositories import Repositories
 from runner import run_agent, deliver_result as runner_deliver
 from tools import get_tool_definitions
+
+
+def _get_all_tool_definitions() -> list[dict]:
+    """Get built-in tool definitions + MCP tools if available."""
+    tools = get_tool_definitions()
+    from mcp_client import get_mcp_manager
+    mcp = get_mcp_manager()
+    if mcp:
+        tools.extend(mcp.get_tool_definitions())
+    return tools
 
 
 def create_agent_for_input(
@@ -18,28 +28,59 @@ def create_agent_for_input(
     *,
     instructions: str,
     input_text: str,
+    input_items: list[dict[str, Any]] | None = None,
     model: str | None = None,
+    agent_name: str | None = None,
+    session_id: str | None = None,
 ) -> str:
-    session = repos.sessions.create()
-    tools = get_tool_definitions()
+    from agent_templates import get_agent_template
+
+    template = get_agent_template(agent_name) if agent_name else None
+
+    resolved_model = model or (template.model if template else None) or DEFAULT_MODEL
+    resolved_instructions = instructions
+    if template and instructions == "You are a helpful assistant.":
+        resolved_instructions = template.system_prompt
+
+    if template and template.tools:
+        tools = get_tool_definitions(template.tools)
+        from mcp_client import get_mcp_manager
+        mcp = get_mcp_manager()
+        if mcp:
+            tools.extend(mcp.get_tool_definitions())
+    else:
+        tools = _get_all_tool_definitions()
+
+    if session_id:
+        session = repos.sessions.get_by_id(session_id)
+        if not session:
+            session = repos.sessions.create()
+    else:
+        session = repos.sessions.create()
+
     agent = repos.agents.create(
         {
             "session_id": session.id,
-            "task": instructions,
+            "task": resolved_instructions,
             "config": {
-                "model": model or DEFAULT_MODEL,
+                "model": resolved_model,
                 "tools": tools,
             },
         }
     )
-    repos.items.create(
-        agent.id,
-        {
-            "type": "message",
-            "role": "user",
-            "content": input_text,
-        },
-    )
+
+    if input_items:
+        for item in input_items:
+            repos.items.create(agent.id, item)
+    else:
+        repos.items.create(
+            agent.id,
+            {
+                "type": "message",
+                "role": "user",
+                "content": input_text,
+            },
+        )
     return agent.id
 
 
@@ -61,14 +102,20 @@ def chat_once(
     repos: Repositories,
     *,
     input_text: str,
+    input_items: list[dict[str, Any]] | None = None,
     instructions: str = "You are a helpful assistant.",
     model: str | None = None,
+    agent_name: str | None = None,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     agent_id = create_agent_for_input(
         repos,
         instructions=instructions,
         input_text=input_text,
+        input_items=input_items,
         model=model,
+        agent_name=agent_name,
+        session_id=session_id,
     )
     result = run_agent(agent_id, repos)
     agent = result["agent"]
@@ -106,6 +153,104 @@ def chat_once(
             "totalTokens": agent.usage.total_tokens,
         }
     return resp
+
+
+def chat_stream(
+    repos: Repositories,
+    *,
+    input_text: str,
+    input_items: list[dict[str, Any]] | None = None,
+    instructions: str = "You are a helpful assistant.",
+    model: str | None = None,
+    agent_name: str | None = None,
+    session_id: str | None = None,
+) -> Generator[StreamEvent, None, None]:
+    """Stream with full multi-turn tool loop (like runAgentStream in TS)."""
+    from config import MAX_TURNS
+    from provider import call_provider, stream_provider
+    from tools import get_tool_type, execute_sync_tool
+
+    agent_id = create_agent_for_input(
+        repos,
+        instructions=instructions,
+        input_text=input_text,
+        input_items=input_items,
+        model=model,
+        agent_name=agent_name,
+        session_id=session_id,
+    )
+    agent = repos.agents.get_by_id(agent_id)
+    agent = start_agent(agent)
+    repos.agents.update(agent)
+
+    model_name = agent.config.model or DEFAULT_MODEL
+    tools_defs = agent.config.tools or _get_all_tool_definitions()
+
+    for _ in range(MAX_TURNS):
+        items = repos.items.list_by_agent(agent.id)
+
+        collected_text = ""
+        collected_calls: list[dict[str, Any]] = []
+        for event in stream_provider(
+            model=model_name,
+            instructions=agent.task,
+            input_items=items,
+            tools=tools_defs,
+            temperature=agent.config.temperature,
+            max_tokens=agent.config.max_tokens,
+        ):
+            yield event
+            if event.type == "text_delta":
+                collected_text += event.data.get("delta", "")
+            elif event.type == "done":
+                collected_calls = event.data.get("function_calls", [])
+
+        if collected_text:
+            repos.items.create(agent.id, {"type": "message", "role": "assistant", "content": collected_text})
+
+        if not collected_calls:
+            from domain import complete_agent as _complete
+            agent = _complete(agent, collected_text or None)
+            repos.agents.update(agent)
+            return
+
+        had_sync_tools = False
+        waiting = False
+        for fc in collected_calls:
+            call_id = fc.get("call_id", "")
+            name = fc.get("name", "")
+            args = fc.get("arguments", {})
+            repos.items.create(agent.id, {"type": "function_call", "call_id": call_id, "name": name, "arguments": args})
+
+            tool_type = get_tool_type(name) or "tool"
+            if tool_type == "sync":
+                had_sync_tools = True
+                if name == "send_message":
+                    from runner import _handle_send_message
+                    ok, result = _handle_send_message(call_id=call_id, args=args, sender=agent, repos=repos)
+                else:
+                    ok, result = execute_sync_tool(name, args)
+                repos.items.create(agent.id, {"type": "function_call_output", "call_id": call_id, "output": result, "is_error": not ok})
+                yield StreamEvent(type="tool_result", data={"call_id": call_id, "name": name, "output": result, "is_error": not ok})
+            elif tool_type == "human":
+                waiting = True
+                yield StreamEvent(type="waiting", data={"call_id": call_id, "name": name, "description": str(args.get("question", ""))})
+            else:
+                from mcp_client import get_mcp_manager
+                mcp = get_mcp_manager()
+                if mcp and mcp.is_mcp_tool(name):
+                    had_sync_tools = True
+                    ok, result = mcp.call_tool(name, args)
+                    repos.items.create(agent.id, {"type": "function_call_output", "call_id": call_id, "output": result, "is_error": not ok})
+                    yield StreamEvent(type="tool_result", data={"call_id": call_id, "name": name, "output": result, "is_error": not ok})
+                else:
+                    waiting = True
+                    yield StreamEvent(type="waiting", data={"call_id": call_id, "name": name})
+
+        if waiting:
+            return
+        if not had_sync_tools:
+            return
 
 
 def deliver_tool_result(

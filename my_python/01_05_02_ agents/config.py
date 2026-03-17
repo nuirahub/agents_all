@@ -27,3 +27,48 @@ DEFAULT_MODEL = AI_CONFIG.resolve_model_for_provider("gpt-4.1")
 MAX_OUTPUT_TOKENS = 8192
 MAX_AGENT_DEPTH = 5
 MAX_TURNS = 10
+
+DATABASE_URL: str = os.getenv("DATABASE_URL", "").strip()
+"""SQLite file path (e.g. '.data/agent.db'). Empty → in-memory repositories."""
+
+
+def _register_providers() -> None:
+    """Register all available providers based on environment config."""
+    from provider_registry import register_provider, set_default_provider
+
+    from provider_openai import OpenAIProvider
+    openai_provider = OpenAIProvider(
+        provider_name=AI_CONFIG.provider,
+        api_key=AI_CONFIG.api_key,
+        base_url=AI_CONFIG.responses_api_endpoint,
+        extra_headers=AI_CONFIG.extra_api_headers,
+        default_max_tokens=MAX_OUTPUT_TOKENS,
+    )
+    register_provider(openai_provider)
+
+    if AI_CONFIG.provider != "openai":
+        openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if openai_key:
+            openai_direct = OpenAIProvider(
+                provider_name="openai",
+                api_key=openai_key,
+                base_url="https://api.openai.com/v1/responses",
+                default_max_tokens=MAX_OUTPUT_TOKENS,
+            )
+            register_provider(openai_direct)
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if gemini_key:
+        from provider_gemini import GeminiProvider
+        gemini_model = os.getenv("GEMINI_DEFAULT_MODEL", "gemini-2.5-flash").strip()
+        gemini_provider = GeminiProvider(
+            api_key=gemini_key,
+            default_model=gemini_model,
+            default_max_tokens=MAX_OUTPUT_TOKENS,
+        )
+        register_provider(gemini_provider)
+
+    set_default_provider(AI_CONFIG.provider)
+
+
+_register_providers()

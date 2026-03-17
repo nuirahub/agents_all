@@ -1,10 +1,18 @@
 """
-Tool definitions and registry for the agent (calculator, ask_user, delegate, send_message).
+Tool definitions and registry for the agent (calculator, ask_user, delegate, send_message, send_email).
 Port of 4th-devs/01_05_agent tools.
 """
+
 from __future__ import annotations
 
+import logging
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
 
 # OpenAI-style function declaration (for API)
 CALCULATOR_DEF = {
@@ -37,7 +45,10 @@ ASK_USER_DEF = {
     "parameters": {
         "type": "object",
         "properties": {
-            "question": {"type": "string", "description": "The question to ask the user"},
+            "question": {
+                "type": "string",
+                "description": "The question to ask the user",
+            },
         },
         "required": ["question"],
     },
@@ -77,10 +88,44 @@ SEND_MESSAGE_DEF = {
     "parameters": {
         "type": "object",
         "properties": {
-            "to": {"type": "string", "description": "The agent ID to send the message to"},
-            "message": {"type": "string", "description": "The message content to deliver"},
+            "to": {
+                "type": "string",
+                "description": "The agent ID to send the message to",
+            },
+            "message": {
+                "type": "string",
+                "description": "The message content to deliver",
+            },
         },
         "required": ["to", "message"],
+    },
+}
+
+SEND_EMAIL_DEF = {
+    "type": "function",
+    "name": "send_email",
+    "description": (
+        "Send an email to a recipient via SMTP. "
+        "Use this when the user asks you to send an email. "
+        "Provide the recipient address, subject line, and body text."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "to": {
+                "type": "string",
+                "description": "Recipient email address",
+            },
+            "subject": {
+                "type": "string",
+                "description": "Email subject line",
+            },
+            "body": {
+                "type": "string",
+                "description": "Email body text (plain text or HTML)",
+            },
+        },
+        "required": ["to", "subject", "body"],
     },
 }
 
@@ -132,6 +177,49 @@ def run_send_message(args: dict[str, Any]) -> tuple[bool, str]:
     return True, f"Message delivered to agent {to}"
 
 
+def run_send_email(args: dict[str, Any]) -> tuple[bool, str]:
+    to_addr = (args.get("to") or "").strip()
+    subject = (args.get("subject") or "").strip()
+    body = (args.get("body") or "").strip()
+
+    if not to_addr:
+        return False, '"to" (recipient address) is required'
+    if not subject:
+        return False, '"subject" is required'
+    if not body:
+        return False, '"body" is required'
+
+    smtp_host = os.getenv("SMTP_HOST", "").strip()
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_pass = os.getenv("SMTP_PASS", "").strip()
+    smtp_from = os.getenv("SMTP_FROM", smtp_user).strip()
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        return False, (
+            "SMTP not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env"
+        )
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = smtp_from
+    msg["To"] = to_addr
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "html" if "<" in body else "plain", "utf-8"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, [to_addr], msg.as_string())
+        logger.info("Email sent to %s (subject: %s)", to_addr, subject)
+        return True, f"Email successfully sent to {to_addr}"
+    except smtplib.SMTPException as exc:
+        logger.error("Failed to send email to %s: %s", to_addr, exc)
+        return False, f"SMTP error: {exc}"
+
+
 # Tool type: "sync" | "human" | "agent"
 # Sync = execute in runner and return result
 # Human = defer, return waitingFor for user to deliver
@@ -141,6 +229,7 @@ TOOL_META: dict[str, tuple[str, dict, Callable[[dict], tuple[bool, str]]]] = {
     "ask_user": ("human", ASK_USER_DEF, run_ask_user),
     "delegate": ("agent", DELEGATE_DEF, run_delegate),
     "send_message": ("sync", SEND_MESSAGE_DEF, run_send_message),
+    "send_email": ("sync", SEND_EMAIL_DEF, run_send_email),
     # web_search is a built-in (no local handler) so we don't add it to TOOL_META
 }
 

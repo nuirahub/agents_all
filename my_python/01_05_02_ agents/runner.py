@@ -4,6 +4,7 @@ Simplified Python port of 4th-devs/01_05_agent runtime.
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from config import DEFAULT_MODEL, MAX_TURNS
@@ -11,12 +12,14 @@ from domain import (
     Agent,
     WaitingFor,
     add_usage,
+    cancel_agent,
     complete_agent,
     deliver_one,
     fail_agent,
     increment_turn,
     start_agent,
 )
+from events import create_event_context, event_emitter
 from provider import call_provider
 from repositories import Repositories
 from tools import execute_sync_tool, get_tool_definitions, get_tool_type
@@ -55,8 +58,16 @@ def run_agent(agent_id: str, repos: Repositories, *, max_turns: int = MAX_TURNS)
         agent = start_agent(agent)
         repos.agents.update(agent)
 
+    ctx = create_event_context(
+        trace_id=agent.trace_id or "",
+        session_id=agent.session_id,
+        agent_id=agent.id,
+        root_agent_id=agent.root_agent_id,
+        depth=agent.depth,
+        parent_agent_id=agent.parent_id,
+    )
+
     if agent.status == "waiting":
-        # Just return current state
         items = repos.items.list_by_agent(agent.id)
         return {"status": "waiting", "agent": agent, "items": items, "waiting_for": list(agent.waiting_for)}
 
@@ -64,22 +75,81 @@ def run_agent(agent_id: str, repos: Repositories, *, max_turns: int = MAX_TURNS)
         items = repos.items.list_by_agent(agent.id)
         return {"status": agent.status, "agent": agent, "items": items, "waiting_for": []}
 
-    for _ in range(max_turns):
-        items = repos.items.list_by_agent(agent.id)
+    agent_start_time = time.time()
+    model = agent.config.model or DEFAULT_MODEL
+    event_emitter.emit({"type": "agent.started", "ctx": ctx, "model": model, "task": agent.task})
 
+    from model_config import get_model_definition
+    from pruning import needs_pruning, prune_conversation
+
+    model_def = get_model_definition(model)
+
+    for _ in range(max_turns):
+        agent = repos.agents.get_by_id(agent_id) or agent
+        if agent.status == "cancelled":
+            event_emitter.emit({"type": "agent.cancelled", "ctx": ctx})
+            items = repos.items.list_by_agent(agent.id)
+            return {"status": "cancelled", "agent": agent, "items": items, "waiting_for": []}
+
+        items = repos.items.list_by_agent(agent.id)
         tools = agent.config.tools or get_tool_definitions()
-        model = agent.config.model or DEFAULT_MODEL
+
+        event_emitter.emit({"type": "turn.started", "ctx": ctx, "turn_count": agent.turn_count + 1})
+
+        provider_items = items
+        if needs_pruning(items, agent.task, model_def.context_window, model_def.pruning.threshold):
+            prune_result = prune_conversation(
+                items, agent.task, model_def.context_window, model_def.pruning,
+            )
+            provider_items = prune_result.items
+            event_emitter.emit({
+                "type": "context.pruned", "ctx": ctx,
+                "dropped_count": prune_result.dropped_count,
+                "truncated_count": prune_result.truncated_count,
+                "estimated_tokens": prune_result.estimated_tokens,
+            })
+
+            if (
+                prune_result.dropped_items
+                and model_def.pruning.enable_summarization
+            ):
+                session = repos.sessions.get_by_id(agent.session_id)
+                if session:
+                    from summarization import generate_summary
+                    session.summary = generate_summary(
+                        prune_result.dropped_items,
+                        previous_summary=session.summary,
+                        model=model,
+                    )
+                    repos.sessions.update(session)
+                    provider_items = [
+                        {"type": "message", "role": "system",
+                         "content": f"[Conversation summary]\n{session.summary}"},
+                    ] + provider_items
+
+        gen_start = time.time()
 
         output_items, usage = call_provider(
             model=model,
             instructions=agent.task,
-            input_items=items,
+            input_items=provider_items,
             tools=tools,
             temperature=agent.config.temperature,
             max_tokens=agent.config.max_tokens,
         )
 
-        # Store provider output as new items
+        gen_ms = (time.time() - gen_start) * 1000
+        usage_dict = {
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "total_tokens": usage.total_tokens,
+            "cached_tokens": usage.cached_tokens,
+        } if usage else None
+        event_emitter.emit({
+            "type": "generation.completed", "ctx": ctx,
+            "model": model, "duration_ms": gen_ms, "usage": usage_dict,
+        })
+
         waiting_for: list[WaitingFor] = []
         had_function_calls = False
 
@@ -112,7 +182,22 @@ def run_agent(agent_id: str, repos: Repositories, *, max_turns: int = MAX_TURNS)
                 tool_type = get_tool_type(name) or "tool"
 
                 if tool_type == "sync":
-                    ok, result = execute_sync_tool(name, args)
+                    event_emitter.emit({"type": "tool.called", "ctx": ctx, "call_id": call_id, "name": name, "arguments": args})
+                    tool_t0 = time.time()
+
+                    if name == "send_message":
+                        ok, result = _handle_send_message(
+                            call_id=call_id, args=args,
+                            sender=agent, repos=repos,
+                        )
+                    else:
+                        ok, result = execute_sync_tool(name, args)
+
+                    tool_ms = (time.time() - tool_t0) * 1000
+                    if ok:
+                        event_emitter.emit({"type": "tool.completed", "ctx": ctx, "call_id": call_id, "name": name, "output": result, "duration_ms": tool_ms})
+                    else:
+                        event_emitter.emit({"type": "tool.failed", "ctx": ctx, "call_id": call_id, "name": name, "error": result, "duration_ms": tool_ms})
                     repos.items.create(
                         agent.id,
                         {
@@ -166,46 +251,67 @@ def run_agent(agent_id: str, repos: Repositories, *, max_turns: int = MAX_TURNS)
                             },
                         )
                 else:
-                    waiting_for.append(
-                        WaitingFor(
-                            call_id=call_id,
-                            type="tool",
-                            name=name,
-                            description="External tool",
+                    # Check MCP tools before deferring
+                    from mcp_client import get_mcp_manager
+                    mcp = get_mcp_manager()
+                    if mcp and mcp.is_mcp_tool(name):
+                        ok, result = mcp.call_tool(name, args)
+                        repos.items.create(
+                            agent.id,
+                            {
+                                "type": "function_call_output",
+                                "call_id": call_id,
+                                "output": result,
+                                "is_error": not ok,
+                            },
                         )
-                    )
+                    else:
+                        waiting_for.append(
+                            WaitingFor(
+                                call_id=call_id,
+                                type="tool",
+                                name=name,
+                                description="External tool",
+                            )
+                        )
 
-        # Apply usage & turn
         if usage:
             agent = add_usage(agent, usage)
         agent = increment_turn(agent)
         repos.agents.update(agent)
+        event_emitter.emit({"type": "turn.completed", "ctx": ctx, "turn_count": agent.turn_count, "usage": usage_dict})
 
         if waiting_for:
             agent = fail_agent_if_invalid_wait(agent, waiting_for)
-            agent = agent if agent.status != "failed" else agent
-            agent = agent  # no-op, just clarity
             from domain import wait_for_many
 
             agent = wait_for_many(agent, waiting_for)
             repos.agents.update(agent)
+            wf_dicts = [{"call_id": w.call_id, "type": w.type, "name": w.name} for w in waiting_for]
+            event_emitter.emit({"type": "agent.waiting", "ctx": ctx, "waiting_for": wf_dicts})
             items = repos.items.list_by_agent(agent.id)
             return {"status": "waiting", "agent": agent, "items": items, "waiting_for": list(waiting_for)}
 
-        # This turn had sync tool calls (or delegate inline) — run another turn so model can respond with text
         if had_function_calls:
             continue
 
-        # No function calls and no pending tool calls → completed
         answer = _extract_answer(repos.items.list_by_agent(agent.id))
         agent = complete_agent(agent, answer)
         repos.agents.update(agent)
+        duration_ms = (time.time() - agent_start_time) * 1000
+        a_usage = {
+            "input_tokens": agent.usage.input_tokens,
+            "output_tokens": agent.usage.output_tokens,
+            "total_tokens": agent.usage.total_tokens,
+            "cached_tokens": agent.usage.cached_tokens,
+        } if agent.usage else None
+        event_emitter.emit({"type": "agent.completed", "ctx": ctx, "duration_ms": duration_ms, "usage": a_usage, "result": answer})
         items = repos.items.list_by_agent(agent.id)
         return {"status": "completed", "agent": agent, "items": items, "waiting_for": []}
 
-    # Max turns exceeded
     agent = fail_agent(agent, f"Max turns exceeded ({max_turns})")
     repos.agents.update(agent)
+    event_emitter.emit({"type": "agent.failed", "ctx": ctx, "error": agent.error})
     items = repos.items.list_by_agent(agent.id)
     return {"status": "failed", "agent": agent, "items": items, "waiting_for": []}
 
@@ -300,7 +406,8 @@ def _run_delegate_child(
     # Tools for child: zgodne z listą z szablonu.
     child_tools = get_tool_definitions(tpl.tools) if tpl.tools else get_tool_definitions()
 
-    # Create child agent in the same session.
+    child_model = tpl.model or parent.config.model or DEFAULT_MODEL
+
     child = repos.agents.create(
         {
             "session_id": parent.session_id,
@@ -311,7 +418,7 @@ def _run_delegate_child(
             "depth": parent.depth + 1,
             "task": task or tpl.system_prompt,
             "config": {
-                "model": parent.config.model or DEFAULT_MODEL,
+                "model": child_model,
                 "tools": child_tools,
             },
         }
@@ -348,4 +455,45 @@ def _run_delegate_child(
 
     # Failed or other terminal state.
     return {"mode": "error", "error": f"Delegated agent '{agent_name}' failed with status {child_result['status']}"}
+
+
+def _handle_send_message(
+    *,
+    call_id: str,
+    args: dict[str, Any],
+    sender: Agent,
+    repos: Repositories,
+) -> tuple[bool, str]:
+    """Intercept send_message: write a system message into the target agent's items."""
+    to = args.get("to")
+    message = args.get("message")
+    if not to or not message:
+        return False, 'send_message requires "to" and "message"'
+
+    target = repos.agents.get_by_id(str(to))
+    if not target:
+        return False, f"Target agent not found: {to}"
+
+    repos.items.create(
+        target.id,
+        {
+            "type": "message",
+            "role": "system",
+            "content": f"[Message from agent {sender.id}]\n\n{message}",
+        },
+    )
+    return True, f"Message delivered to agent {to}"
+
+
+def cancel_running_agent(agent_id: str, repos: Repositories) -> dict[str, Any]:
+    """Cancel a running or waiting agent."""
+    agent = repos.agents.get_by_id(agent_id)
+    if not agent:
+        raise RunError(f"Agent not found: {agent_id}")
+    if agent.status not in {"running", "waiting", "pending"}:
+        raise RunError(f"Cannot cancel agent in status: {agent.status}")
+    agent = cancel_agent(agent)
+    repos.agents.update(agent)
+    items = repos.items.list_by_agent(agent.id)
+    return {"status": "cancelled", "agent": agent, "items": items, "waiting_for": []}
 
