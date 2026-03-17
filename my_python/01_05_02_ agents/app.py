@@ -26,8 +26,10 @@ from starlette.responses import StreamingResponse
 
 def _create_repos():
     from config import DATABASE_URL
+
     if DATABASE_URL:
         from db import create_sqlite_repositories
+
         return create_sqlite_repositories(DATABASE_URL)
     return create_memory_repositories()
 
@@ -81,9 +83,11 @@ async def lifespan(app: FastAPI):
 
     from events import event_emitter
     from tracing import init_tracing
+
     init_tracing(event_emitter)
 
     from config import DATABASE_URL
+
     if DATABASE_URL:
         logger.info(f"Storage: SQLite ({DATABASE_URL})")
     else:
@@ -101,6 +105,7 @@ async def lifespan(app: FastAPI):
     yield
 
     from tracing import shutdown_tracing
+
     shutdown_tracing()
     shutdown_mcp()
 
@@ -169,7 +174,11 @@ async def request_logging(request: Request, call_next):
     response.headers["x-response-time"] = f"{ms:.0f}ms"
     response.headers["x-content-type-options"] = "nosniff"
     response.headers["x-frame-options"] = "DENY"
-    log_fn = logger.error if status >= 500 else (logger.warning if status >= 400 else logger.info)
+    log_fn = (
+        logger.error
+        if status >= 500
+        else (logger.warning if status >= 400 else logger.info)
+    )
     log_fn(f"{method} {path} → {status} ({ms:.0f}ms) [{request_id[:8]}]")
     return response
 
@@ -226,7 +235,9 @@ async def create_completion(body: ChatRequest, user=Depends(require_auth)):
         session_id=body.sessionId,
     )
     status_code = 202 if resp.get("status") == "waiting" else 200
-    return JSONResponse(content=ChatResponse(**resp).model_dump(), status_code=status_code)
+    return JSONResponse(
+        content=ChatResponse(**resp).model_dump(), status_code=status_code
+    )
 
 
 def _parse_input(raw: str | list) -> tuple[str, list[dict[str, Any]] | None]:
@@ -236,7 +247,11 @@ def _parse_input(raw: str | list) -> tuple[str, list[dict[str, Any]] | None]:
     items: list[dict[str, Any]] = []
     first_text = ""
     for item in raw:
-        d = item.model_dump(exclude_none=True) if hasattr(item, "model_dump") else dict(item)
+        d = (
+            item.model_dump(exclude_none=True)
+            if hasattr(item, "model_dump")
+            else dict(item)
+        )
         items.append(d)
         if not first_text and d.get("type") == "message" and d.get("role") == "user":
             c = d.get("content", "")
@@ -280,9 +295,7 @@ async def get_agent_status(agent_id: str, user=Depends(require_auth)):
 
 
 @app.post("/api/chat/agents/{agent_id}/deliver")
-async def deliver(
-    agent_id: str, body: DeliverRequest, user=Depends(require_auth)
-):
+async def deliver(agent_id: str, body: DeliverRequest, user=Depends(require_auth)):
     resp = deliver_tool_result(
         repos,
         agent_id=agent_id,
@@ -291,7 +304,9 @@ async def deliver(
         is_error=body.isError,
     )
     status_code = 202 if resp.get("status") == "waiting" else 200
-    return JSONResponse(content=DeliverResponse(**resp).model_dump(), status_code=status_code)
+    return JSONResponse(
+        content=DeliverResponse(**resp).model_dump(), status_code=status_code
+    )
 
 
 # ── Cancel agent ──────────────────────────────────────────────────────────────

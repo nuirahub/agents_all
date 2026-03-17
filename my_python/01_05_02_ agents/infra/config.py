@@ -11,7 +11,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-ROOT_DIR = Path(__file__).resolve().parent
+# Project root = parent of infra/ (i.e. 01_05_02_ agents)
+ROOT_DIR = Path(__file__).resolve().parent.parent
 _env_path = ROOT_DIR.parent / ".env"
 load_dotenv(_env_path)
 
@@ -36,6 +37,7 @@ def _register_providers() -> None:
     """Register all available providers based on environment config."""
     from infra.provider_registry import register_provider, set_default_provider
     from infra.provider_openai import OpenAIProvider
+
     openai_provider = OpenAIProvider(
         provider_name=AI_CONFIG.provider,
         api_key=AI_CONFIG.api_key,
